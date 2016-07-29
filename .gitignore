@@ -1,0 +1,6 @@
+# ignore weird .ds_store thing
+.DS_Store
+# ignore JSON product of ned_get and any other txt file
+*.txt
+# except todo.txt
+!todo.txt
