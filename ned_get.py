@@ -19,12 +19,37 @@ keys = ["exclusion code", "record index", "object index", "object name","dm",
 
 
 def obj_filter(r, o):
-    n = r['object name'].replace(" ","").lower()
-    o = o.replace(" ","").lower()
-    if n == o:
+    '''
+    Return a row that matches the desired object. All strings are
+    normalized to first letter of catalog, lowercase, with no space
+    between it and the number of the object in the catalog.
+
+    Args:
+        r (dict): Row from NED to check for matching object name
+        under key 'object name'
+
+        o (string): Input object name user is searching for in NED
+        
+    Returns:
+        r (dict): the same row that was input
+    
+    '''
+    
+    
+    num_db = ''.join( [ x for x in r['object name'].replace(" ", "")if not x.isalpha()] ).lstrip("0")  # deletes all spaces, lower cases everything, and strips all leading 0's while getting only the string's numeric characters
+    num_in = ''.join( [ x for x in o.replace(" ", "") if not x.isalpha()] ).lstrip("0") 
+    if len(num_db) > 4:
+        num_db = num_db[:5]
+    n_db = r['object name'][0].lower() + num_db
+#    print(n_db)
+    if len(num_in) > 4:
+        num_in = num_in[:5]
+    n_in = o[0].lower() + num_in
+#    print(n_in)
+    if n_db == n_in: # compares the first letter of object name plus the first four numbers
         return r
 
-def get_dm(r): # need separate get_dm function bc of the replacement 
+def get_dm(r): # need separate get_dm function bc of the replacement of 18.5 for ""
     d = r['LMCmod']
     if d == "":
         return 18.5
@@ -71,15 +96,16 @@ while True:
         reader = csv.reader(f)
         for row in reader:
             drow = dict(zip(keys, row))
-            r = obj_filter(drow, obj)
-            if r != None and r['dmerr']: # python empty strings are 'falsy'
-                objRows.append(r)
-                t = True
+            if drow['object name']: # check to make sure the 'object name' value is not empty
+                r = obj_filter(drow, obj)
+                if r != None and r['dmerr']: # excludes values with no error on dm measurement
+                    objRows.append(r)
+                    t = True
     if t:
         print("The query successfully returned {0} entries for {1}. \n".format(len(objRows),obj))
         break
     else:
-        print("\n    The object name {0} is either not present or \n"
+        print("\n    Sorry! The object name {0} is either not present or \n"
           "    the naming format is not correct. Try looking at a \n"
           "    few rows in the database to find the right convention. \n".format(obj))
 
@@ -112,11 +138,14 @@ while True:
               "    in the database to find the right convention. \n".format(m))
 
               
-obj_short = obj[0] + ''.join( [ x for x in obj.replace(" ", "") if not x.isalpha()] )
+num_obj = ''.join( [ x for x in obj.replace(" ", "") if not x.isalpha()] ).lstrip('0')
+if len(num_obj) > 4:
+        num_obj = num_obj[:5]
+obj_short = obj[0] + num_obj
 methods_short = [s.replace(" ", "").lower()[0:2] for s in methods]
 
 import json
-with open("{0}_{1}.txt".format(obj_short, "_".join(methods_short)), 'w') as fout:
+with open("{0}_{1}.txt".format(obj_short, "_".join(methods_short)), 'w') as fout: # limit obj name to 5 chars (cat + 4 nums)
     json.dump(finalRows, fout)
 
 
