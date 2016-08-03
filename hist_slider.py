@@ -29,13 +29,18 @@ print(methods)
 
 
 
-def hist(d, err, b = 15):
+def hist(d, err, bins):
     '''
+    Parameters
+    ----------
     d: array of distance moduli
     
     b: number of bins for the histogram
+
+    w: optional parameter to specify bar width
     
-    Returns:
+    Returns
+    -------
     
     h: histogram values
     
@@ -44,7 +49,7 @@ def hist(d, err, b = 15):
     wid: width of bars
     '''
     # want to weight by err! #
-    h, binedges = np.histogram(d, bins = b)
+    h, binedges = np.histogram(d, bins)
     c  = 0.5 * (binedges[1:] + binedges[:-1])
     try:
         wid = np.ptp(d)/15
@@ -53,7 +58,7 @@ def hist(d, err, b = 15):
         print("\nNo distance moduli found in this  \n"
               "range of years and LMC zero point     " )
         pass
-    return h, c, wid      
+    return h, c, wid    
 
 
 #########################################################################
@@ -64,25 +69,47 @@ def hist(d, err, b = 15):
 fig, ax = plt.subplots()
 plt.subplots_adjust(left=0.25, bottom=0.35)
 
+# all these lists are for later looping through with each call of update() #
 lmcs_list = [ ]
 years_list = [ ]
 dms_list = [ ]
 dmerrs_list = [ ]
 rects_list = [ ]
+c0_list = [ ]
+w0_list = [ ]
 N_tots = [ ]
+bins_list = [ ]
+# loop through each method and corresponding colors you want #
+#def sort_methods(methods, dms):
+# need to sort the methods list by counts so that the rr lyrae
+# don't get hidden
+#    N_tots = [ ]
+#    for m in methods:
+#        N_tots.append(len(dms))
+for m in methods:
+    dms = np.array([float(x['dm']) for x in d if x['method'] == m])
+    N_tots.append(len(dms))
+method_sort = list(zip(methods,N_tots))
+method_sort.sort(key=lambda x: -x[1])
+methods = [x[0] for x in method_sort]
+print(methods)
 for m,c in zip(methods, colors):
     dms = np.array([float(x['dm']) for x in d if x['method'] == m])
-    dmerrs = np.array([float(x['dmerr']) for x in d if x['method'] == m])
-    lmcs = np.array([ 18.5 if not x['LMCmod'] else float(x['LMCmod']) for x in d if x['method'] == m])
-    years = np.array([float(x['date']) for x in d if x['method'] == m]) + 1980
     dms_list.append(dms)
+    dmerrs = np.array([float(x['dmerr']) for x in d if x['method'] == m])
     dmerrs_list.append(dmerrs)
+    lmcs = np.array([ 18.5 if not x['LMCmod'] else float(x['LMCmod']) for x in d if x['method'] == m])
     lmcs_list.append(lmcs)
+    years = np.array([float(x['date']) for x in d if x['method'] == m]) + 1980
     years_list.append(years)
-    N_tots.append(len(dms))
     ind = np.where( (years >= min_yr0) & (years <= max_yr0) & (lmcs >= min_lmc0) & (lmcs <= max_lmc0) )[0]
-    h0, centers0, w0 = hist(dms[ind], dmerrs[ind])
-    rects_list.append(plt.bar(centers0, h0, width = w0, label = m, color = c))
+    bins = np.linspace(min(dms),max(dms), 15) #aha! the key is that bins will be based on the nontrimmed dms while they are trimmed elsewhere.
+    print(bins)
+    heights0, centers0, width0= hist(dms[ind], dmerrs[ind], bins)
+    c0_list.append(centers0)
+    w0_list.append(width0)
+    bins_list.append(bins)
+    rects_list.append(plt.bar(centers0, heights0, width = width0, label = m, color = c))
 plt.legend()
 
 axcolor = 'lightgoldenrodyellow'
@@ -105,15 +132,16 @@ def update(val):
     max_yr = smax_yr.val
     min_lmc = smin_lmc.val
     max_lmc = smax_lmc.val
-    for m, c, dms, dmerrs, rects, years, lmcs in zip(methods, colors, dms_list, dmerrs_list, rects_list, years_list, lmcs_list):
+    for m, col, dms, dmerrs, rects, years, lmcs, bins in zip(methods, colors, dms_list, dmerrs_list, rects_list, years_list, lmcs_list, bins_list):
 #       np.where() gives you indices and just having the args of np.where() w/o the call
 #       gives a boolean array!
         ind = np.where( (years >= min_yr) & (years <= max_yr) & (lmcs >= min_lmc) & (lmcs <= max_lmc) )[0]
-        heights, centers, widths = hist(dms[ind], dmerrs[ind])
+        heights, centers, width = hist(dms[ind], dmerrs[ind], bins)
         for r, h in zip(rects, heights):
             r.set_height(h)
-#           r.set_width(w)
-# don't want to keep remaking width
+#            r.set_width(width)
+#            r.set_x(c)
+# don't want to keep remaking width. It's the *centers* I want to keep the same. Duh
     fig.canvas.draw_idle()
 smin_yr.on_changed(update)
 smax_yr.on_changed(update)
@@ -134,13 +162,23 @@ button.on_clicked(reset)
 cax = plt.axes([0.05, 0.4, 0.125, 0.15])
 check = CheckButtons(cax, methods, (True, True, True))
 
-def func(label): # remember to add or remove methods here
-    if label == 'Cepheids' and label in methods:
-        rects1.set_visible(not rects1.get_visible())
-    elif label == 'TRGB' and label in methods:
-        rects2.set_visible(not rects2.get_visible())
-    elif label == 'RR Lyrae' and label in methods:
-        rects3.set_visible(not rects3.get_visible())
+# this painful hiding code is bc "get_alpha" is unfortunately not
+# of the rectangle class
+def func(label):
+    t = False
+    for m, rects in zip(methods, rects_list):
+        if label == m:
+            r_origs = [x.get_height for x in rects]
+            for r in rects: # set transparency to max to hide
+#make sure to call get_alpha() and not just name the method (forgetting the parentheses)
+                if r.get_alpha() != 0: # make sure that it's not already hidden
+                    t = True
+            if t == True: #don't want to check for true on every r in rect
+                for r in rects:
+                    r.set_alpha(0)
+            else:
+                for r, r_orig in zip(rects, r_origs):
+                    r.set_alpha(1)
     plt.draw()
 check.on_clicked(func)
 

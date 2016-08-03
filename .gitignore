@@ -4,3 +4,5 @@
 *.txt
 # except todo.txt
 !todo.txt
+# ipynb won't be updated
+*.ipynb
