@@ -1,19 +1,6 @@
 Main goal: to make a GUI functionality to toggle options on distance measurements
-    a.) 2 way sliding bar to choose a date range @@@ Done! @@@
-    b.) 2 way sliding bar to choose a lmc mod range @@@ Done! @@@
-    c.) check boxes to choose objects -- no! Just one object at a time; makes more sense
-    d.) check boxes select measurement methods
 
-2.) Find a way to weight the histogram counts by the (inverse) error on the
+1.) Weight the histogram counts by the (inverse) error on the
 measurement.
 
-3.) Find a prettier way to handle when min goes higher than max
-
-
-Additional:
-    a.) Radio button(s) for weighted by error, by recentness, or both
-    b.) Add object radio buttons and a while loop similar to the methods
-    loop to grab mutliple objects from NED
-    c.) Stop the rebinning with each new slide so a change in counts can be seen better
-    d.) Fix the transparency issues (again)
-    
+2.)  Radio button(s) for weighted by error, by recentness, or both
